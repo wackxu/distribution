@@ -698,14 +698,11 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 			}
 
 			if len(output.Errors) > 0 {
-				errs := make([]error, 0, len(output.Errors))
+				errs := make([]string, 0, len(output.Errors))
 				for _, err := range output.Errors {
-					errs = append(errs, errors.New(err.Message))
+					errs = append(errs, err.Message)
 				}
-				return storagedriver.Errors{
-					DriverName: driverName,
-					Errs:       errs,
-				}
+				return errors.New(strings.Join(errs, ";"))
 			}
 		}
 		// NOTE: we don't want to reallocate
