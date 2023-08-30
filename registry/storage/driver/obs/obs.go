@@ -302,6 +302,18 @@ func getParameterAsInt64(parameters map[string]interface{}, name string, default
 // New constructs a new Driver with the given Aliyun credentials, region, encryption flag, and
 // bucketName
 func New(params DriverParameters) (*Driver, error) {
+	var logFullPath string = "./logs/OBS-SDK.log"
+	// 设置每个日志文件的大小，单位：字节
+	var maxLogSize int64 = 1024 * 1024 * 10
+	// 设置保留日志文件的个数
+	var backups int = 10
+	// 设置日志的级别
+	var level = obs.LEVEL_DEBUG
+	// 设置是否打印日志到控制台
+	var logToConsole bool = true
+	// 开启日志
+	obs.InitLog(logFullPath, maxLogSize, backups, level, logToConsole)
+
 	client, err := obs.New(params.AccessKey, params.SecretKey, params.Endpoint)
 	if err != nil {
 		return nil, err
