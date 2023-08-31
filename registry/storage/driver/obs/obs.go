@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"math"
 	"net/http"
@@ -302,7 +303,7 @@ func getParameterAsInt64(parameters map[string]interface{}, name string, default
 // New constructs a new Driver with the given Aliyun credentials, region, encryption flag, and
 // bucketName
 func New(params DriverParameters) (*Driver, error) {
-	var logFullPath string = "./logs/OBS-SDK.log"
+	var logFullPath string = ""
 	// 设置每个日志文件的大小，单位：字节
 	var maxLogSize int64 = 1024 * 1024 * 10
 	// 设置保留日志文件的个数
@@ -313,6 +314,8 @@ func New(params DriverParameters) (*Driver, error) {
 	var logToConsole bool = true
 	// 开启日志
 	obs.InitLog(logFullPath, maxLogSize, backups, level, logToConsole)
+
+	log.Infof("obs init.................")
 
 	client, err := obs.New(params.AccessKey, params.SecretKey, params.Endpoint)
 	if err != nil {
@@ -350,6 +353,7 @@ func (d *driver) Name() string {
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 	reader, err := d.Reader(ctx, path, 0)
 	if err != nil {
+		log.Errorf("GetContent err: %v", err)
 		return nil, err
 	}
 	return io.ReadAll(reader)
@@ -365,6 +369,9 @@ func (d *driver) PutContent(ctx context.Context, path string, contents []byte) e
 	input.StorageClass = d.getStorageClass()
 	input.SseHeader = d.getEncryptionMode()
 	_, err := d.Client.PutObject(input)
+	if err != nil {
+		log.Errorf("PutContent input %v, err: %v", input, err)
+	}
 	return d.parseError(path, err)
 }
 
@@ -924,6 +931,16 @@ func (w *writer) Write(p []byte) (n int, err error) {
 				SourceSseHeader:  w.driver.getEncryptionMode(),
 			})
 			if err != nil {
+				log.Errorf("CopyPart request %v, err: %v", obs.CopyPartInput{
+					Bucket:           w.driver.Bucket,
+					Key:              w.key,
+					CopySourceBucket: w.driver.Bucket,
+					CopySourceKey:    w.key,
+					PartNumber:       1,
+					UploadId:         w.uploadID,
+					SseHeader:        w.driver.getEncryptionMode(),
+					SourceSseHeader:  w.driver.getEncryptionMode(),
+				}, err)
 				return 0, err
 			}
 			w.parts = []obs.Part{
@@ -992,6 +1009,13 @@ func (w *writer) flushPart() error {
 		SseHeader:  w.driver.getEncryptionMode(),
 	})
 	if err != nil {
+		log.Errorf("UploadPart reee %v, err: %v", obs.UploadPartInput{
+			Bucket:     w.driver.Bucket,
+			Key:        w.key,
+			PartNumber: len(w.parts) + 1,
+			UploadId:   w.uploadID,
+			SseHeader:  w.driver.getEncryptionMode(),
+		}, err)
 		return err
 	}
 	w.parts = append(w.parts, obs.Part{
